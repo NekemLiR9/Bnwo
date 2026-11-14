@@ -1,0 +1,12 @@
+BRAINROT RUNNER 67 - Android-Projekt
+
+APK bauen mit Android Studio (PC):
+1. Android Studio installieren und diesen Ordner oeffnen.
+2. Warten, bis "Gradle Sync" fertig ist.
+3. Menue: Build > Build App Bundle(s) / APK(s) > Build APK(s).
+4. Die Datei liegt dann in app/build/outputs/apk/debug/app-debug.apk
+5. APK aufs Handy kopieren und installieren.
+
+Ohne Android Studio (GitHub):
+Ordnerinhalt in ein GitHub-Repository hochladen. Unter "Actions" baut
+der Workflow "Build APK" die APK; sie haengt dann am Lauf als Download.
