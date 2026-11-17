@@ -3,11 +3,22 @@ package com.brainrot.runner67;
 import android.app.Activity;
 import android.os.Bundle;
 import android.view.View;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
 public class MainActivity extends Activity {
     private WebView web;
+    private Relay relay;
+
+    public class Bridge {
+        @JavascriptInterface public String startServer() {
+            try { if (relay == null) { relay = new Relay(6767); relay.start(); } return Relay.localIp(); }
+            catch (Exception e) { return "ERR:" + e.getMessage(); }
+        }
+        @JavascriptInterface public void stopServer() { if (relay != null) { relay.shutdown(); relay = null; } }
+        @JavascriptInterface public String ip() { return Relay.localIp(); }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -18,6 +29,7 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        web.addJavascriptInterface(new Bridge(), "Android");
         setContentView(web);
         web.loadUrl("file:///android_asset/index.html");
     }
@@ -32,6 +44,9 @@ public class MainActivity extends Activity {
                     | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
     }
+
+    @Override
+    protected void onDestroy() { if (relay != null) relay.shutdown(); super.onDestroy(); }
 
     @Override
     protected void onPause() { super.onPause(); web.onPause(); }

@@ -82,6 +82,7 @@ body.cine #barT,body.cine #barB{transform:none}
 #netMsg b{font-family:'Bungee',Impact,sans-serif;font-size:34px;color:#7dff5c;letter-spacing:4px}
 .nrow{display:flex;gap:8px}.nrow .big{font-size:18px;padding:10px 14px}
 #netCode{flex:1;min-width:0;font:inherit;font-size:24px;text-align:center;border-radius:16px;border:3px solid #fff;background:#24104a;color:#fff;user-select:text;-webkit-user-select:text}
+#net{overflow-y:auto}.sep{font-size:12px;color:#7dfcff;margin:6px 0}#onl,#lan{display:flex;flex-direction:column;gap:8px}#lanIp{flex:1;min-width:0;font:inherit;font-size:17px;text-align:center;border-radius:16px;border:3px solid #fff;background:#24104a;color:#fff;user-select:text;-webkit-user-select:text}
 #netList{font-size:15px;line-height:1.6}
 @media (max-height:760px){#menu{gap:8px;padding-bottom:18px}#menu .big{font-size:18px;padding:9px 22px}#sub{font-size:12px}#how{font-size:11px}#menu h1{top:4vh;font-size:min(11vw,50px)}}
 .hide{display:none!important}
@@ -111,9 +112,13 @@ body.cine #barT,body.cine #barB{transform:none}
   <div id="how">📱 Wischen: ← → Spur · ↑ Springen · ↓ Rutschen<br><b>Doppeltipp = Furz-Turbo 💨</b> · Tippen = Schießen 🔫<br>⌨️ Pfeile/WASD · F = Furz · Leertaste = Schießen</div>
 </div>
 <div id="net" class="hide"><div class="nbox"><h2>👥 MULTIPLAYER</h2>
-  <div id="netMsg">Erstelle einen Raum oder gib den Code deines Freundes ein.</div>
+  <div id="netMsg">Wähle, wie ihr spielen wollt.</div>
+  <div id="onl"><div class="sep">🌍 ONLINE – überall, braucht Internet</div>
   <button id="netHost" class="big">RAUM ERSTELLEN</button>
-  <div class="nrow"><input id="netCode" inputmode="numeric" maxlength="4" placeholder="Code"><button id="netJoin" class="big">BEITRETEN</button></div>
+  <div class="nrow"><input id="netCode" inputmode="numeric" maxlength="4" placeholder="Code"><button id="netJoin" class="big">BEITRETEN</button></div></div>
+  <div id="lan"><div class="sep">📶 HANDY-SERVER – gleiches WLAN oder Hotspot, ohne Internet</div>
+  <button id="lanHost" class="big">SERVER STARTEN</button>
+  <div class="nrow"><input id="lanIp" inputmode="decimal" placeholder="IP z.B. 192.168.43.1"><button id="lanJoin" class="big">VERBINDEN</button></div></div>
   <div id="netList"></div>
   <button id="netStart" class="big hide">RENNEN STARTEN 🏁</button>
   <button id="netClose" class="big" style="font-size:16px;background:#444;box-shadow:none">ZURÜCK</button></div></div>
@@ -1256,13 +1261,13 @@ function qualityCheck(dt){if(SV.gfx!=='auto')return;if(MODE!=='run'&&MODE!=='men
 
 /* =================== Multiplayer über Internet (APK, PeerJS) =================== */
 var ICE={iceServers:[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']},{urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}]};
-var NET={peer:null,host:false,conns:[],players:{},on:false,code:''};
+var NET={peer:null,host:false,conns:[],players:{},on:false,code:'',mode:'p2p'};
 function netUI(msg){if(msg!==undefined)$('netMsg').innerHTML=msg;
   var ids=Object.keys(NET.players),h='';
   if(NET.on){h='✅ '+NICK.replace(/[<>&]/g,'')+' (du)'+(NET.host?' 👑':'');ids.forEach(function(k){var p=NET.players[k];h+='<br>✅ '+String(p.nick||'?').replace(/[<>&]/g,'');});}
   $('netList').innerHTML=h;$('netStart').classList.toggle('hide',!(NET.host&&ids.length>0));
-  var np=typeof window.Peer!=='function';$('netHost').classList.toggle('hide',NET.on||np);$('netCode').parentNode.classList.toggle('hide',NET.on||np);}
-function netReset(){try{NET.conns.forEach(function(c){c.close()});if(NET.peer)NET.peer.destroy();}catch(e){}NET={peer:null,host:false,conns:[],players:{},on:false,code:''};}
+  var np=typeof window.Peer!=='function';$('onl').classList.toggle('hide',NET.on||np);$('lan').classList.toggle('hide',NET.on||!window.Android);}
+function netReset(){try{NET.conns.forEach(function(c){c.close()});if(NET.ws)NET.ws.close();if(NET.peer&&NET.peer.destroy)NET.peer.destroy();}catch(e){}if(NET.lan&&window.Android)try{Android.stopServer()}catch(e){}NET={peer:null,host:false,conns:[],players:{},on:false,code:'',mode:'p2p'};}
 function netCreate(){netReset();var code=String(1000+Math.floor(Math.random()*9000)),p=new Peer('br67-'+code,{debug:0,config:ICE});NET.peer=p;NET.host=true;NET.code=code;netUI('Verbinde …');
   p.on('open',function(){NET.on=true;netUI('Dein Raum-Code:<br><b>'+code+'</b><br>Freunde tippen ihn bei „Beitreten" ein.');});
   p.on('connection',function(c){if(NET.conns.length>=5){c.close();return;}netWire(c);});
@@ -1274,12 +1279,13 @@ function netJoin(code){code=String(code||'').replace(/\D/g,'').slice(0,4);if(cod
 function netWire(c){c.on('open',function(){NET.conns.push(c);NET.on=true;netSend({t:'hi',id:NET.peer.id,nick:NICK,ch:SV.ch});if(!NET.host)netUI('Verbunden! Warte, bis der Host das Rennen startet …');else netUI();sfx('power');});
   c.on('data',function(d){netRecv(c,d);});
   c.on('close',function(){NET.conns=NET.conns.filter(function(x){return x!==c});var gone=c.peer;if(NET.host){delete NET.players[gone];netSend({t:'bye',id:gone});}else{NET.players={};NET.on=false;netUI('Verbindung zum Host verloren.');}netUI();});}
-function netSend(m,except){NET.conns.forEach(function(c){if(c!==except&&c.open){try{c.send(m)}catch(e){}}});}
+function netSend(m,except){if(NET.mode==='ws'){if(NET.ws&&NET.ws.readyState===1)try{NET.ws.send(JSON.stringify(m))}catch(e){}return;}NET.conns.forEach(function(c){if(c!==except&&c.open){try{c.send(m)}catch(e){}}});}
 function netRecv(c,d){if(!d||typeof d!=='object')return;
   if((d.t==='st'||d.t==='hi')&&typeof d.id==='string'&&NET.peer&&d.id!==NET.peer.id){
     var o=NET.players[d.id]||(NET.players[d.id]={});o.nick=String(d.nick||o.nick||'?').slice(0,14);o.ch=typeof d.ch==='string'?d.ch:(o.ch||'kid');
     if(d.t==='st'){o.run=!!d.run;o.lane=d.lane|0;o.py=+d.py||0;o.sl=d.sl?1:0;o.d=+d.d||0;o.aura=+d.aura||0;}
-    if(NET.host){netSend(d,c);if(d.t==='hi'){netSend({t:'hi',id:NET.peer.id,nick:NICK,ch:SV.ch},null);for(var k in NET.players)if(k!==d.id)try{c.send({t:'hi',id:k,nick:NET.players[k].nick,ch:NET.players[k].ch})}catch(e){}}}
+    if(d.t==='hi'&&NET.mode==='ws'&&!d.re)netSend({t:'hi',re:1,id:NET.peer.id,nick:NICK,ch:SV.ch});
+    if(NET.host&&NET.mode!=='ws'){netSend(d,c);if(d.t==='hi'){netSend({t:'hi',id:NET.peer.id,nick:NICK,ch:SV.ch},null);for(var k in NET.players)if(k!==d.id)try{c.send({t:'hi',id:k,nick:NET.players[k].nick,ch:NET.players[k].ch})}catch(e){}}}
     if(d.t==='hi'&&$('net').classList.contains('hide')===false)netUI();}
   else if(d.t==='bye'){delete NET.players[d.id];}
   else if(d.t==='start'&&!NET.host){raceStart(d.seed>>>0);}
@@ -1291,6 +1297,17 @@ $('netBtn').addEventListener('click',function(){initAudio();$('net').classList.r
 $('netClose').addEventListener('click',function(){$('net').classList.add('hide');$('menu').classList.remove('hide');});
 $('netHost').addEventListener('click',function(){netCreate();});
 $('netJoin').addEventListener('click',function(){netJoin($('netCode').value);});
+function netWs(ip,ok){var ws;try{ws=new WebSocket('ws://'+ip+':6767');}catch(e){netUI('Verbindung nicht möglich.');return;}
+  NET.ws=ws;NET.mode='ws';NET.peer={id:'w'+Math.random().toString(36).slice(2,10)};
+  ws.onopen=function(){NET.on=true;netSend({t:'hi',id:NET.peer.id,nick:NICK,ch:SV.ch});ok();netUI();sfx('power');};
+  ws.onmessage=function(e){var d;try{d=JSON.parse(e.data)}catch(x){return;}netRecv(null,d);};
+  ws.onclose=function(){if(NET.ws===ws&&NET.on){NET.on=false;NET.players={};netUI('Verbindung getrennt.');}};
+  ws.onerror=function(){if(!NET.on)netUI('Keine Verbindung zu '+ip+'. Seid ihr im selben WLAN oder Hotspot?');};}
+$('lanHost').addEventListener('click',function(){if(!window.Android)return;netReset();var ip='';try{ip=Android.startServer();}catch(e){}
+  if(!ip||ip.indexOf('ERR')===0){netUI('Server konnte nicht starten. WLAN oder Hotspot einschalten!');return;}
+  NET.host=true;NET.lan=true;netWs('127.0.0.1',function(){netUI('📶 Server läuft! Freunde im selben WLAN/Hotspot tippen diese IP ein:<br><b style="font-size:24px;letter-spacing:1px">'+ip+'</b>');});});
+$('lanJoin').addEventListener('click',function(){var ip=$('lanIp').value.trim();if(!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)){netUI('Bitte die IP vom Host eingeben, z.B. 192.168.43.1');return;}
+  netReset();netUI('Verbinde mit '+ip+' …');netWs(ip,function(){netUI('Verbunden! Warte, bis der Host startet …');});});
 $('netStart').addEventListener('click',function(){var seed=(Math.random()*4294967295)>>>0;netSend({t:'start',seed:seed});raceStart(seed);});
 
 var GFX=['auto','niedrig','mittel','hoch'],GFXN={auto:'AUTO',niedrig:'NIEDRIG',mittel:'MITTEL',hoch:'HOCH'};
